@@ -1,87 +1,99 @@
 let map;
 let userMarker;
+let destinationMarker;
 let routeLine;
-let shortcutLine;
 
+let destinationCoords = null;
 let currentRoute = [];
 let travelHistory = [];
-let navigating = false;
-
-let destination = null;
-
-// load saved shortcuts
 let savedShortcuts = JSON.parse(localStorage.getItem("shortcuts")) || [];
 
-// ---------- INIT MAP ----------
-function initMap() {
 
-  map = L.map('map').setView([13.0827,80.2707], 13); // Chennai start
+// ---------- INIT ----------
+function initMap() {
+  map = L.map('map').setView([13.0827,80.2707], 13);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution:'© OpenStreetMap'
   }).addTo(map);
-}
-
-window.onload = initMap;
-
-// ---------- START NAVIGATION ----------
-function startNavigation() {
-
-  let fromInput = document.getElementById("from").value;
-  let toInput = document.getElementById("to").value;
-
-  if (!toInput) {
-    alert("Enter destination lat,lng");
-    return;
-  }
-
-  destination = toInput.split(',').map(Number);
-
-  navigating = true;
-  travelHistory = [];
 
   trackLocation();
 }
 
-// ---------- GPS TRACKING ----------
+window.onload = initMap;
+
+
+// ---------- GET CURRENT LOCATION ----------
 function trackLocation() {
 
   navigator.geolocation.watchPosition(pos => {
-
-    if (!navigating) return;
 
     let userLocation = [pos.coords.latitude, pos.coords.longitude];
 
     updateUserMarker(userLocation);
 
-    travelHistory.push(userLocation);
-
-    getRoute(userLocation);
-    detectDeviation(userLocation);
-    checkAutoShortcut(userLocation);
+    if(destinationCoords){
+      drawRoute(userLocation);
+      detectDeviation(userLocation);
+      learnShortcut(userLocation);
+    }
 
   }, err => console.log(err), {
-    enableHighAccuracy:true,
-    maximumAge:0,
-    timeout:5000
+    enableHighAccuracy:true
   });
 }
 
-// ---------- USER MARKER ----------
-function updateUserMarker(location) {
 
-  if (!userMarker) {
+// ---------- USER MARKER ----------
+function updateUserMarker(location){
+
+  if(!userMarker){
     userMarker = L.marker(location).addTo(map);
-    map.setView(location,16);
-  } else {
+    map.setView(location,15);
+  }else{
     userMarker.setLatLng(location);
   }
 }
 
-// ---------- ROUTE ----------
-function getRoute(start) {
 
-  let url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${destination[1]},${destination[0]}?overview=full&geometries=geojson`;
+// ---------- SEARCH DESTINATION NAME ----------
+function startNavigation(){
+
+  let place = document.getElementById("destination").value;
+
+  if(!place){
+    alert("Enter destination name");
+    return;
+  }
+
+  document.getElementById("status").innerText="Searching location...";
+
+  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${place}`)
+  .then(res=>res.json())
+  .then(data=>{
+
+    if(data.length===0){
+      alert("Location not found");
+      return;
+    }
+
+    destinationCoords = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
+
+    if(destinationMarker) map.removeLayer(destinationMarker);
+
+    destinationMarker = L.marker(destinationCoords).addTo(map);
+    map.setView(destinationCoords,16);
+
+    document.getElementById("status").innerText="Destination found. Navigating...";
+
+  });
+}
+
+
+// ---------- ROUTE ----------
+function drawRoute(start){
+
+  let url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${destinationCoords[1]},${destinationCoords[0]}?overview=full&geometries=geojson`;
 
   fetch(url)
   .then(res=>res.json())
@@ -91,10 +103,12 @@ function getRoute(start) {
     currentRoute = coords.map(c=>[c[1],c[0]]);
 
     if(routeLine) map.removeLayer(routeLine);
+
     routeLine = L.polyline(currentRoute,{color:'blue'}).addTo(map);
 
   });
 }
+
 
 // ---------- WRONG ROUTE ----------
 function detectDeviation(userLocation){
@@ -108,61 +122,28 @@ function detectDeviation(userLocation){
     if(dist<minDistance) minDistance = dist;
   });
 
-  if(minDistance>35){
-    document.getElementById("status").innerText="Wrong route... recalculating";
-    getRoute(userLocation);
+  if(minDistance>40){
+    document.getElementById("status").innerText="Re-routing...";
+    drawRoute(userLocation);
   }
 }
 
-// ---------- AUTO LEARN SHORTCUT ----------
-function checkAutoShortcut(userLocation){
 
-  if(travelHistory.length<30) return;
+// ---------- AUTO SHORTCUT LEARNING ----------
+function learnShortcut(userLocation){
 
-  // if destination reached
-  let distToDestination = map.distance(userLocation,destination);
+  travelHistory.push(userLocation);
+
+  let distToDestination = map.distance(userLocation,destinationCoords);
 
   if(distToDestination<40){
 
-    saveShortcut(travelHistory);
-    travelHistory=[];
-    navigating=false;
-
-    document.getElementById("status").innerText="Route learned!";
-  }
-
-  // compare existing shortcuts
-  savedShortcuts.forEach(shortcut=>{
-
-    let shortcutDistance = calculateDistance(shortcut);
-    let routeDistance = calculateDistance(currentRoute);
-
-    if(shortcutDistance < routeDistance*0.85){
-
-      if(shortcutLine) map.removeLayer(shortcutLine);
-
-      shortcutLine = L.polyline(shortcut,{color:'green'}).addTo(map);
-
-      document.getElementById("status").innerText="Using learned shortcut!";
+    if(travelHistory.length>25){
+      savedShortcuts.push(travelHistory);
+      localStorage.setItem("shortcuts",JSON.stringify(savedShortcuts));
+      document.getElementById("status").innerText="Shortcut learned!";
     }
-  });
-}
 
-// ---------- SAVE SHORTCUT ----------
-function saveShortcut(path){
-
-  savedShortcuts.push(path);
-  localStorage.setItem("shortcuts",JSON.stringify(savedShortcuts));
-}
-
-// ---------- DISTANCE ----------
-function calculateDistance(path){
-
-  let distance=0;
-
-  for(let i=1;i<path.length;i++){
-    distance+=map.distance(path[i-1],path[i]);
+    travelHistory=[];
   }
-
-  return distance;
 }
