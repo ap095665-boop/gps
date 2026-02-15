@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Smart Navigation Chennai</title>
+  <title>Smart Google-Link Navigation</title>
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
+  <!-- Leaflet / OpenStreetMap -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
@@ -20,7 +21,7 @@
       background:white;
       padding:12px;
       border-radius:10px;
-      width:260px;
+      width:290px;
       box-shadow:0 0 10px rgba(0,0,0,0.2);
     }
 
@@ -36,13 +37,14 @@
 <body>
 
 <div id="controls">
-  <b>Navigation</b>
+  <b>Navigation from Google Link</b>
 
-  <input id="destination" placeholder="Enter apartment / place name">
+  <input id="destinationInput"
+         placeholder="Paste Google link / place / coordinates">
 
-  <button onclick="startNavigation()">Start</button>
+  <button onclick="startNavigation()">Start Navigation</button>
 
-  <div id="status">Waiting for input...</div>
+  <div id="status">Waiting for destination...</div>
 </div>
 
 <div id="map"></div>
