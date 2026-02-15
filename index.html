@@ -1,36 +1,58 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Chennai Smart Navigation (OSM)</title>
+  <title>Smart Navigation with Auto Shortcut Learning</title>
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- Leaflet (OpenStreetMap library) -->
+  <!-- OpenStreetMap Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
   <style>
-    body { margin:0; }
+    body { margin:0; font-family:Arial; }
     #map { height:100vh; width:100%; }
-    #status {
+
+    #controls {
       position:absolute;
       top:10px;
       left:10px;
+      z-index:999;
       background:white;
       padding:10px;
-      z-index:999;
-      font-size:14px;
+      border-radius:8px;
+      box-shadow:0 0 10px rgba(0,0,0,0.2);
+      width:260px;
+    }
+
+    input, button {
+      width:100%;
+      margin-top:6px;
+      padding:8px;
+    }
+
+    #status {
+      margin-top:8px;
+      font-size:13px;
+      color:#333;
     }
   </style>
 </head>
 <body>
 
-<div id="status">Starting GPS...</div>
+<div id="controls">
+  <b>Smart Navigation</b>
+
+  <input id="from" placeholder="From (lat,lng optional)">
+  <input id="to" placeholder="Destination lat,lng">
+
+  <button onclick="startNavigation()">Start Navigation</button>
+
+  <div id="status">Waiting...</div>
+</div>
+
 <div id="map"></div>
-<button onclick="saveShortcut()" 
-style="position:absolute;bottom:20px;left:20px;z-index:999;padding:10px;">
-Save this route as shortcut
-</button>
+
 <script src="app.js"></script>
 
 </body>
