@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chennai Smart Navigation (OSM)</title>
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet (OpenStreetMap library) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <style>
+    body { margin:0; }
+    #map { height:100vh; width:100%; }
+    #status {
+      position:absolute;
+      top:10px;
+      left:10px;
+      background:white;
+      padding:10px;
+      z-index:999;
+      font-size:14px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="status">Starting GPS...</div>
+<div id="map"></div>
+
+<script src="app.js"></script>
+
+</body>
+</html>
