@@ -2,15 +2,18 @@ let map;
 let userMarker;
 let destinationMarker;
 let routeLine;
+let shortcutLine;
 
 let destinationCoords = null;
 let currentRoute = [];
 let travelHistory = [];
+
 let savedShortcuts = JSON.parse(localStorage.getItem("shortcuts")) || [];
 
 
 // ---------- INIT ----------
 function initMap() {
+
   map = L.map('map').setView([13.0827,80.2707], 13);
 
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -23,7 +26,7 @@ function initMap() {
 window.onload = initMap;
 
 
-// ---------- GET CURRENT LOCATION ----------
+// ---------- TRACK USER GPS ----------
 function trackLocation() {
 
   navigator.geolocation.watchPosition(pos => {
@@ -36,6 +39,7 @@ function trackLocation() {
       drawRoute(userLocation);
       detectDeviation(userLocation);
       learnShortcut(userLocation);
+      checkShortcut(userLocation);
     }
 
   }, err => console.log(err), {
@@ -56,41 +60,53 @@ function updateUserMarker(location){
 }
 
 
-// ---------- SEARCH DESTINATION NAME ----------
-function startNavigation(){
+// ---------- GOOGLE LINK EXTRACTOR ----------
+function extractCoordinates(url){
 
-  let place = document.getElementById("destination").value;
+  // pattern 1: @lat,lng
+  let match = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
 
-  if(!place){
-    alert("Enter destination name");
-    return;
-  }
+  if(match) return [parseFloat(match[1]), parseFloat(match[2])];
 
-  document.getElementById("status").innerText="Searching location...";
+  // pattern 2: q=lat,lng
+  match = url.match(/q=(-?\d+\.\d+),(-?\d+\.\d+)/);
 
-  fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${place}`)
-  .then(res=>res.json())
-  .then(data=>{
+  if(match) return [parseFloat(match[1]), parseFloat(match[2])];
 
-    if(data.length===0){
-      alert("Location not found");
-      return;
-    }
-
-    destinationCoords = [parseFloat(data[0].lat), parseFloat(data[0].lon)];
-
-    if(destinationMarker) map.removeLayer(destinationMarker);
-
-    destinationMarker = L.marker(destinationCoords).addTo(map);
-    map.setView(destinationCoords,16);
-
-    document.getElementById("status").innerText="Destination found. Navigating...";
-
-  });
+  return null;
 }
 
 
-// ---------- ROUTE ----------
+// ---------- START NAVIGATION ----------
+function startNavigation(){
+
+  let link = document.getElementById("googleLink").value;
+
+  if(!link){
+    alert("Paste Google Maps link");
+    return;
+  }
+
+  let coords = extractCoordinates(link);
+
+  if(!coords){
+    alert("Unable to extract coordinates from link");
+    return;
+  }
+
+  destinationCoords = coords;
+
+  if(destinationMarker) map.removeLayer(destinationMarker);
+
+  destinationMarker = L.marker(destinationCoords).addTo(map);
+
+  map.setView(destinationCoords,16);
+
+  document.getElementById("status").innerText="Destination loaded. Navigating...";
+}
+
+
+// ---------- ROUTE DRAW ----------
 function drawRoute(start){
 
   let url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${destinationCoords[1]},${destinationCoords[0]}?overview=full&geometries=geojson`;
@@ -110,7 +126,7 @@ function drawRoute(start){
 }
 
 
-// ---------- WRONG ROUTE ----------
+// ---------- WRONG ROUTE DETECTION ----------
 function detectDeviation(userLocation){
 
   if(currentRoute.length===0) return;
@@ -123,13 +139,13 @@ function detectDeviation(userLocation){
   });
 
   if(minDistance>40){
-    document.getElementById("status").innerText="Re-routing...";
+    document.getElementById("status").innerText="Wrong route. Re-routing...";
     drawRoute(userLocation);
   }
 }
 
 
-// ---------- AUTO SHORTCUT LEARNING ----------
+// ---------- AUTO LEARN SHORTCUT ----------
 function learnShortcut(userLocation){
 
   travelHistory.push(userLocation);
@@ -139,11 +155,48 @@ function learnShortcut(userLocation){
   if(distToDestination<40){
 
     if(travelHistory.length>25){
+
       savedShortcuts.push(travelHistory);
       localStorage.setItem("shortcuts",JSON.stringify(savedShortcuts));
+
       document.getElementById("status").innerText="Shortcut learned!";
     }
 
     travelHistory=[];
   }
+}
+
+
+// ---------- USE BEST SHORTCUT ----------
+function checkShortcut(userLocation){
+
+  if(savedShortcuts.length===0) return;
+
+  savedShortcuts.forEach(shortcut=>{
+
+    let shortcutDistance = calculateDistance(shortcut);
+    let routeDistance = calculateDistance(currentRoute);
+
+    if(shortcutDistance < routeDistance*0.85){
+
+      if(shortcutLine) map.removeLayer(shortcutLine);
+
+      shortcutLine = L.polyline(shortcut,{color:'green'}).addTo(map);
+
+      document.getElementById("status").innerText="Using learned shortcut route";
+    }
+  });
+}
+
+
+// ---------- DISTANCE ----------
+function calculateDistance(path){
+
+  let distance=0;
+
+  for(let i=1;i<path.length;i++){
+    distance+=map.distance(path[i-1],path[i]);
+  }
+
+  return distance;
 }
