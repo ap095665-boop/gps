@@ -1,17 +1,16 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Smart Navigation with Auto Shortcut Learning</title>
+  <title>Smart Navigation Chennai</title>
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <!-- OpenStreetMap Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
   <style>
     body { margin:0; font-family:Arial; }
-    #map { height:100vh; width:100%; }
+    #map { height:100vh; }
 
     #controls {
       position:absolute;
@@ -19,10 +18,10 @@
       left:10px;
       z-index:999;
       background:white;
-      padding:10px;
-      border-radius:8px;
-      box-shadow:0 0 10px rgba(0,0,0,0.2);
+      padding:12px;
+      border-radius:10px;
       width:260px;
+      box-shadow:0 0 10px rgba(0,0,0,0.2);
     }
 
     input, button {
@@ -31,29 +30,23 @@
       padding:8px;
     }
 
-    #status {
-      margin-top:8px;
-      font-size:13px;
-      color:#333;
-    }
+    #status { margin-top:8px; font-size:13px; }
   </style>
 </head>
 <body>
 
 <div id="controls">
-  <b>Smart Navigation</b>
+  <b>Navigation</b>
 
-  <input id="from" placeholder="From (lat,lng optional)">
-  <input id="to" placeholder="Destination lat,lng">
+  <input id="destination" placeholder="Enter apartment / place name">
 
-  <button onclick="startNavigation()">Start Navigation</button>
+  <button onclick="startNavigation()">Start</button>
 
-  <div id="status">Waiting...</div>
+  <div id="status">Waiting for input...</div>
 </div>
 
 <div id="map"></div>
 
 <script src="app.js"></script>
-
 </body>
 </html>
