@@ -1,107 +1,190 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>High Accuracy Tracker</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Growing Plant Game</title>
 
-  <style>
-    body { font-family: Arial; padding: 20px; }
-    .box {
-      background:#f4f4f4;
-      padding:15px;
-      margin-bottom:12px;
-      border-radius:10px;
-    }
-    button { padding:10px; width:100%; }
-  </style>
+<style>
+body {
+    margin: 0;
+    background: linear-gradient(#0a0a0a, #1c1c1c);
+    overflow: hidden;
+    font-family: sans-serif;
+    color: white;
+}
+
+canvas {
+    display: block;
+}
+
+#ui {
+    position: fixed;
+    bottom: 20px;
+    width: 100%;
+    text-align: center;
+}
+
+button {
+    padding: 10px 20px;
+    border-radius: 20px;
+    border: none;
+    background: rgba(255,255,255,0.1);
+    color: white;
+}
+
+#water {
+    position: fixed;
+    left: 20px;
+    bottom: 100px;
+    width: 50px;
+    height: 50px;
+    background: cyan;
+    border-radius: 10px;
+    cursor: grab;
+}
+
+#well {
+    position: fixed;
+    left: 20px;
+    bottom: 20px;
+    width: 70px;
+    height: 70px;
+    background: #333;
+    border-radius: 50%;
+}
+</style>
 </head>
 <body>
 
-<h2>High Accuracy Location Tracker</h2>
+<canvas id="canvas"></canvas>
 
-<div class="box">
-  <b>Latitude:</b> <span id="lat">--</span><br>
-  <b>Longitude:</b> <span id="lng">--</span><br>
-  <b>Speed:</b> <span id="speed">--</span><br>
-  <b>Heading:</b> <span id="heading">--</span>
+<div id="well"></div>
+<div id="water" draggable="true"></div>
+
+<div id="ui">
+    <button onclick="saveProgress()">💾 Save</button>
 </div>
-
-<div class="box">
-  <b>Movement:</b> <span id="movement">--</span><br>
-  <b>Steps Detected:</b> <span id="steps">0</span>
-</div>
-
-<div class="box">
-  <b>System Status:</b> <span id="status">Starting...</span>
-</div>
-
-<button onclick="startTracking()">Start Tracking</button>
-<button onclick="savePath()">Save Shortcut Path</button>
 
 <script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
 
-let steps = 0;
-let travelPath = [];
-let heading = 0;
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-// ---------- GPS TRACKING ----------
-function startTracking(){
+let plant = {
+    growth: 0,
+    wateredToday: false
+};
 
-  document.getElementById("status").innerText="Tracking active";
+let today = new Date();
+let targetDate = new Date(today.getFullYear(), 11, 25); // Dec 25
 
-  navigator.geolocation.watchPosition(pos=>{
+// LOAD
+let saved = JSON.parse(localStorage.getItem("plantGame"));
+if (saved) plant = saved;
 
-    let lat = pos.coords.latitude;
-    let lng = pos.coords.longitude;
-    let speed = pos.coords.speed || 0;
+// CALCULATE GROWTH BASED ON DATE
+function calculateGrowth() {
+    let start = new Date(today.getFullYear(), 0, 1);
+    let totalDays = (targetDate - start) / (1000*60*60*24);
+    let currentDays = (today - start) / (1000*60*60*24);
 
-    document.getElementById("lat").innerText = lat;
-    document.getElementById("lng").innerText = lng;
-    document.getElementById("speed").innerText = speed;
-
-    travelPath.push({lat,lng});
-
-  }, err=>console.log(err), {
-    enableHighAccuracy:true
-  });
-
-  initSensors();
+    let baseGrowth = currentDays / totalDays;
+    plant.growth = Math.max(plant.growth, baseGrowth);
 }
 
+calculateGrowth();
 
-// ---------- SENSOR FUSION ----------
-function initSensors(){
+// WIND EFFECT
+let wind = 0;
+setInterval(() => {
+    wind = (Math.random() - 0.5) * 0.5;
+}, 2000);
 
-  // compass
-  window.addEventListener("deviceorientation", e=>{
-    heading = e.alpha || 0;
-    document.getElementById("heading").innerText =
-      Math.round(heading)+"°";
-  });
+// DRAW PLANT
+function drawPlant() {
+    let baseX = canvas.width / 2;
+    let baseY = canvas.height - 100;
 
-  // motion detection
-  window.addEventListener("devicemotion", e=>{
-    let movement = e.accelerationIncludingGravity;
+    let height = plant.growth * 300;
 
-    if(movement.x > 2 || movement.y > 2){
-      steps++;
-      document.getElementById("steps").innerText = steps;
-      document.getElementById("movement").innerText="Moving";
-    } else {
-      document.getElementById("movement").innerText="Still";
+    ctx.strokeStyle = "lime";
+    ctx.lineWidth = 4;
+
+    ctx.beginPath();
+    ctx.moveTo(baseX, baseY);
+
+    // stem with wind sway
+    for (let i = 0; i < height; i += 5) {
+        let sway = Math.sin(i * 0.05 + Date.now() * 0.002) * 10 + wind * 50;
+        ctx.lineTo(baseX + sway, baseY - i);
     }
-  });
+
+    ctx.stroke();
+
+    // leaves
+    for (let i = 50; i < height; i += 50) {
+        ctx.fillStyle = "green";
+        ctx.beginPath();
+        ctx.ellipse(baseX + 20, baseY - i, 10, 5, 0, 0, Math.PI*2);
+        ctx.fill();
+    }
+
+    // FULLY GROWN → FRUITS
+    if (plant.growth >= 1) {
+        drawFruits(baseX, baseY - height);
+    }
 }
 
+// FRUITS
+function drawFruits(x, y) {
+    for (let i = 0; i < 5; i++) {
+        let fx = x + Math.cos(i) * 50;
+        let fy = y - Math.sin(i) * 30;
 
-// ---------- SAVE SHORTCUT PATH ----------
-function savePath(){
-
-  localStorage.setItem("learnedPath", JSON.stringify(travelPath));
-
-  alert("Path saved! System learned this shortcut.");
+        ctx.fillStyle = "red";
+        ctx.beginPath();
+        ctx.arc(fx, fy, 10, 0, Math.PI*2);
+        ctx.fill();
+    }
 }
 
+// CLICK FRUIT → SECRET
+canvas.addEventListener("click", e => {
+    if (plant.growth >= 1) {
+        alert("🎁 Secret Unlocked!\n\nYou stayed consistent.\nReward: /secret.html");
+    }
+});
+
+// WATER DRAG
+const water = document.getElementById("water");
+
+water.addEventListener("dragend", e => {
+    let plantAreaX = canvas.width / 2;
+
+    if (Math.abs(e.clientX - plantAreaX) < 100) {
+        if (!plant.wateredToday) {
+            plant.growth += 0.01;
+            plant.wateredToday = true;
+        }
+    }
+});
+
+// SAVE
+function saveProgress() {
+    localStorage.setItem("plantGame", JSON.stringify(plant));
+}
+
+// LOOP
+function loop() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    drawPlant();
+    requestAnimationFrame(loop);
+}
+
+loop();
 </script>
 
 </body>
