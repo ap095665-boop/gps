@@ -3,20 +3,18 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Plant Growth Game</title>
+<title>Living Plant</title>
 
 <style>
 body {
     margin: 0;
-    background: #0b0b0b;
+    background: radial-gradient(circle, #0a0a0a, #000);
     overflow: hidden;
     font-family: Arial;
     color: white;
 }
 
-canvas {
-    display: block;
-}
+canvas { display: block; }
 
 /* WELL */
 #well {
@@ -29,6 +27,7 @@ canvas {
     border-radius: 50%;
     text-align: center;
     line-height: 70px;
+    font-size: 22px;
 }
 
 /* BUCKET */
@@ -36,23 +35,32 @@ canvas {
     position: fixed;
     left: 20px;
     bottom: 110px;
-    width: 50px;
-    height: 50px;
-    background: gray;
+    width: 55px;
+    height: 55px;
+    background: #444;
     border-radius: 10px;
     cursor: grab;
 }
 
-.full {
-    background: cyan !important;
+.full { background: cyan !important; }
+
+/* POINTS BIG */
+#points {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    font-size: 40px;
+    font-weight: bold;
 }
 
-/* UI */
-#info {
-    position: fixed;
-    top: 10px;
-    left: 10px;
-    font-size: 14px;
+/* FLASH */
+.flash {
+    animation: flash 0.4s;
+}
+@keyframes flash {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.4); color: lime; }
+    100% { transform: scale(1); }
 }
 </style>
 </head>
@@ -60,57 +68,38 @@ canvas {
 
 <canvas id="canvas"></canvas>
 
-<div id="well">🕳️</div>
+<div id="well">💧</div>
 <div id="bucket"></div>
-
-<div id="info">
-🌱 Points: <span id="points">0</span><br>
-📅 Day: <span id="day"></span>
-</div>
+<div id="points">0</div>
 
 <script>
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
+canvas.width = innerWidth;
+canvas.height = innerHeight;
 
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
-
-// ===== LOAD / INIT =====
-let data = JSON.parse(localStorage.getItem("plantData")) || {
-    startDate: new Date().toISOString(),
-    lastWaterDate: "",
-    points: 0,
-    bonusGrowth: 0
+// ===== DATA =====
+let data = JSON.parse(localStorage.getItem("plantGame")) || {
+    start: new Date().toISOString(),
+    growth: 0,
+    points: 0
 };
 
-// ===== DATE =====
-let today = new Date();
-let todayStr = today.toDateString();
+// ===== SAVE =====
+function save() {
+    localStorage.setItem("plantGame", JSON.stringify(data));
+}
 
-let startDate = new Date(data.startDate);
-let targetDate = new Date(today.getFullYear(), 11, 25);
-
-// ===== DAY COUNT =====
-let days = Math.floor((today - startDate)/(1000*60*60*24));
-document.getElementById("day").innerText = days;
-
-// ===== GROWTH =====
-let totalDays = (targetDate - startDate)/(1000*60*60*24);
-let passedDays = (today - startDate)/(1000*60*60*24);
-
-let growth = Math.min(1, (passedDays / totalDays) + data.bonusGrowth);
-
-// ===== BUCKET STATE =====
+// ===== BUCKET =====
 let bucket = document.getElementById("bucket");
 let isFull = false;
 
-// ===== FILL FROM WELL =====
 document.getElementById("well").onclick = () => {
     isFull = true;
     bucket.classList.add("full");
 };
 
-// ===== DRAG =====
+// DRAG
 bucket.draggable = true;
 
 bucket.addEventListener("dragend", e => {
@@ -118,38 +107,55 @@ bucket.addEventListener("dragend", e => {
 
     if (Math.abs(e.clientX - plantX) < 120 && isFull) {
 
-        // ONE WATER PER DAY
-        if (data.lastWaterDate !== todayStr) {
+        // WATER EFFECT
+        data.growth += 0.002;
+        data.points += 1;
 
-            data.lastWaterDate = todayStr;
-            data.points += 10;
-            data.bonusGrowth += 0.02;
+        reaction = 30;
+        flashPoints();
 
-            reactionEffect();
+        save();
 
-            save();
-
-        } else {
-            alert("Already watered today 💧");
-        }
-
-        // EMPTY BUCKET
+        // EMPTY
         isFull = false;
         bucket.classList.remove("full");
     }
 });
 
-// ===== SAVE =====
-function save() {
-    localStorage.setItem("plantData", JSON.stringify(data));
+// ===== POINT FLASH =====
+function flashPoints() {
+    let el = document.getElementById("points");
+    el.innerText = data.points;
+    el.classList.add("flash");
+    setTimeout(()=>el.classList.remove("flash"), 300);
 }
 
-// ===== PLANT REACTION =====
+// ===== WIND =====
+let wind = 0;
+setInterval(()=> wind = (Math.random()-0.5)*0.5, 2000);
+
+// ===== RAIN SYSTEM =====
+let raining = false;
+
+setInterval(()=>{
+    raining = Math.random() < 0.3; // 30% chance
+}, 8000);
+
+// ===== PARTICLES =====
+let rainDrops = [];
+
+function spawnRain() {
+    if (!raining) return;
+
+    rainDrops.push({
+        x: Math.random()*canvas.width,
+        y: 0,
+        speed: 5 + Math.random()*5
+    });
+}
+
+// ===== REACTION =====
 let reaction = 0;
-
-function reactionEffect() {
-    reaction = 20;
-}
 
 // ===== DRAW =====
 function drawPlant() {
@@ -157,7 +163,7 @@ function drawPlant() {
     let baseX = canvas.width / 2;
     let baseY = canvas.height - 80;
 
-    let height = growth * 400;
+    let height = data.growth * 500;
 
     ctx.strokeStyle = "lime";
     ctx.lineWidth = 4;
@@ -165,63 +171,81 @@ function drawPlant() {
     ctx.beginPath();
     ctx.moveTo(baseX, baseY);
 
-    for (let i = 0; i < height; i += 5) {
-        let sway = Math.sin(i*0.05 + Date.now()*0.002) * 10;
+    for (let i=0;i<height;i+=5) {
+        let sway = Math.sin(i*0.05 + Date.now()*0.002)*10 + wind*50;
         ctx.lineTo(baseX + sway, baseY - i);
     }
 
     ctx.stroke();
 
     // LEAVES
-    for (let i = 50; i < height; i += 60) {
+    for (let i=60;i<height;i+=70) {
         ctx.fillStyle = "green";
         ctx.beginPath();
-        ctx.ellipse(baseX + 20, baseY - i, 10, 5, 0, 0, Math.PI*2);
+        ctx.ellipse(baseX+20, baseY-i, 12,6,0,0,Math.PI*2);
         ctx.fill();
     }
 
-    // REACTION GLOW
-    if (reaction > 0) {
+    // GLOW REACTION
+    if (reaction>0) {
         ctx.fillStyle = "rgba(0,255,0,0.2)";
         ctx.beginPath();
-        ctx.arc(baseX, baseY - height, 40, 0, Math.PI*2);
+        ctx.arc(baseX, baseY-height, 50,0,Math.PI*2);
         ctx.fill();
         reaction--;
     }
 
-    // 🎄 DEC 25 → FRUITS
-    if (growth >= 1) drawFruits(baseX, baseY - height);
+    // FRUITS ON DEC 25
+    if (isDec25()) drawFruits(baseX, baseY-height);
+}
+
+// ===== RAIN DRAW =====
+function drawRain() {
+
+    spawnRain();
+
+    rainDrops.forEach((r,i)=>{
+        ctx.fillStyle = "cyan";
+        ctx.fillRect(r.x, r.y, 2, 10);
+        r.y += r.speed;
+
+        // WATER EFFECT
+        if (r.y > canvas.height-100) {
+            data.growth += 0.0005;
+            data.points += 0.2;
+            rainDrops.splice(i,1);
+        }
+    });
+}
+
+// ===== DATE CHECK =====
+function isDec25() {
+    let d = new Date();
+    return d.getMonth() === 11 && d.getDate() === 25;
 }
 
 // ===== FRUITS =====
-let secretFruit = 2;
+let secretFruit = Math.floor(Math.random()*5);
 
-function drawFruits(x, y) {
-    for (let i = 0; i < 5; i++) {
+function drawFruits(x,y) {
 
-        let fx = x + Math.cos(i * 1.2) * 60;
-        let fy = y - Math.sin(i * 1.2) * 40;
+    for (let i=0;i<5;i++) {
+
+        let fx = x + Math.cos(i*1.2)*70;
+        let fy = y - Math.sin(i*1.2)*40;
 
         ctx.fillStyle = "red";
         ctx.beginPath();
-        ctx.arc(fx, fy, 12, 0, Math.PI*2);
+        ctx.arc(fx, fy, 12,0,Math.PI*2);
         ctx.fill();
 
-        // CLICK DETECTION
         canvas.onclick = e => {
             let dx = e.clientX - fx;
             let dy = e.clientY - fy;
 
-            if (Math.sqrt(dx*dx + dy*dy) < 15) {
-
-                if (i === secretFruit) {
-
-                    if (data.points >= 200) {
-                        window.location.href = "secret.html";
-                    } else {
-                        alert("Not enough points");
-                    }
-
+            if (Math.sqrt(dx*dx+dy*dy)<15) {
+                if (i===secretFruit) {
+                    window.location.href = "secret.html";
                 } else {
                     alert("Nothing here...");
                 }
@@ -232,17 +256,19 @@ function drawFruits(x, y) {
 
 // ===== LOOP =====
 function loop() {
-    ctx.clearRect(0,0,canvas.width,canvas.height);
+
+    ctx.fillStyle = "rgba(0,0,0,0.2)";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
 
     drawPlant();
+    drawRain();
 
-    document.getElementById("points").innerText = data.points;
+    document.getElementById("points").innerText = Math.floor(data.points);
 
     requestAnimationFrame(loop);
 }
 
 loop();
 </script>
-
 </body>
 </html>
