@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Plant Survival - Hard Mode</title>
+<title>Plant Survival</title>
 
 <style>
 body {
     margin: 0;
-    background: #000;
+    background: radial-gradient(circle, #0a0a0a, #000);
     overflow: hidden;
     font-family: Arial;
     color: white;
@@ -16,6 +16,7 @@ body {
 
 canvas { display: block; }
 
+/* WELL */
 #well {
     position: fixed;
     left: 20px;
@@ -26,8 +27,10 @@ canvas { display: block; }
     border-radius: 50%;
     text-align: center;
     line-height: 70px;
+    font-size: 22px;
 }
 
+/* BUCKET */
 #bucket {
     position: fixed;
     left: 20px;
@@ -36,19 +39,23 @@ canvas { display: block; }
     height: 55px;
     background: #444;
     border-radius: 10px;
+    cursor: grab;
 }
 .full { background: cyan !important; }
 
+/* POINTS */
 #points {
     position: fixed;
     top: 20px;
     right: 20px;
-    font-size: 36px;
+    font-size: 38px;
+    font-weight: bold;
 }
 
+/* ALERT */
 #alert {
     position: fixed;
-    top: 40%;
+    top: 35%;
     width: 100%;
     text-align: center;
     font-size: 28px;
@@ -60,10 +67,11 @@ canvas { display: block; }
 <body>
 
 <canvas id="canvas"></canvas>
+
 <div id="well">💧</div>
 <div id="bucket"></div>
 <div id="points">0</div>
-<div id="alert">🌪️ TAP FAST OR DIE</div>
+<div id="alert">🌪️ BUILD SHIELD!</div>
 
 <script>
 const canvas = document.getElementById("canvas");
@@ -81,7 +89,7 @@ function save(){
     localStorage.setItem("plantGame", JSON.stringify(data));
 }
 
-// ===== BUCKET =====
+// ===== BUCKET SYSTEM =====
 let bucket = document.getElementById("bucket");
 let isFull = false;
 
@@ -96,12 +104,12 @@ bucket.addEventListener("dragend", e=>{
     let plantX = canvas.width/2;
 
     if(Math.abs(e.clientX-plantX)<120 && isFull){
-        data.growth += 0.0008;
+        data.growth += 0.001;
         data.points += 1;
 
         if(data.growth > 1) data.growth = 1;
 
-        reaction = 20;
+        reaction = 25;
 
         save();
 
@@ -112,96 +120,92 @@ bucket.addEventListener("dragend", e=>{
 
 // ===== RAIN =====
 let raining = false;
-setInterval(()=>{
-    raining = Math.random()<0.25;
-}, 8000);
+let rainDrops = [];
 
-let rainDrops=[];
+setInterval(()=>{
+    raining = Math.random() < 0.3;
+}, 7000);
 
 function drawRain(){
     if(raining){
         rainDrops.push({
             x: Math.random()*canvas.width,
-            y:0,
-            speed:6+Math.random()*5
+            y: 0,
+            speed: 5 + Math.random()*5
         });
     }
 
     rainDrops.forEach((r,i)=>{
-        ctx.fillStyle="cyan";
-        ctx.fillRect(r.x,r.y,2,12);
-        r.y+=r.speed;
+        ctx.fillStyle = "cyan";
+        ctx.fillRect(r.x, r.y, 2, 12);
+        r.y += r.speed;
 
-        if(r.y>canvas.height-100){
-            data.growth += 0.0002;
+        if(r.y > canvas.height-100){
+            data.growth += 0.0003;
             if(data.growth > 1) data.growth = 1;
             rainDrops.splice(i,1);
         }
     });
 }
 
-// ===== CYCLONE (HARD MODE) =====
+// ===== CYCLONE + SHIELD =====
 let cyclone = false;
-let taps = 0;
-let lastCheck = Date.now();
 let cycloneTimer = 0;
 
+let shieldPower = 0;
+let maxShield = 100;
+
+// start cyclone randomly
 setInterval(()=>{
-    if(!cyclone && Math.random()<0.2){
+    if(!cyclone && Math.random() < 0.2){
         cyclone = true;
-        taps = 0;
         cycloneTimer = 0;
-        document.getElementById("alert").style.display="block";
+        shieldPower = 0;
+        document.getElementById("alert").style.display = "block";
     }
 }, 10000);
 
-// TAP TRACK
+// tapping builds shield
 canvas.addEventListener("click", ()=>{
     if(cyclone){
-        taps++;
+        shieldPower += 10;
+        if(shieldPower > maxShield) shieldPower = maxShield;
     }
 });
 
+// cyclone logic
 function updateCyclone(){
     if(!cyclone) return;
 
     cycloneTimer++;
 
-    let now = Date.now();
-    let tps = taps / ((now - lastCheck)/1000);
+    // shield drains constantly
+    shieldPower -= 1.2;
+    if(shieldPower < 0) shieldPower = 0;
 
-    // REQUIRE FAST TAPPING (>= 6 taps/sec)
-    if(tps >= 6){
-        // protected
-    } else {
-        // HEAVY DAMAGE
-        data.growth -= 0.02;
+    // if weak shield → damage
+    if(shieldPower < 40){
+        data.growth -= 0.006;
     }
 
-    // clamp
     if(data.growth < 0) data.growth = 0;
 
-    // reset counter every second
-    if(now - lastCheck > 1000){
-        taps = 0;
-        lastCheck = now;
-    }
-
-    // end cyclone after duration
-    if(cycloneTimer > 180){
+    // end cyclone
+    if(cycloneTimer > 240){
         cyclone = false;
-        document.getElementById("alert").style.display="none";
+        document.getElementById("alert").style.display = "none";
+        shieldPower = 0;
     }
 }
 
-// ===== DRAW PLANT =====
+// ===== PLANT DRAW =====
 let reaction = 0;
 
 function drawPlant(){
     let x = canvas.width/2;
     let y = canvas.height-80;
 
-    let h = data.growth * 400;
+    let h = data.growth * 420;
 
     ctx.strokeStyle = cyclone ? "red" : "lime";
     ctx.lineWidth = 4;
@@ -211,7 +215,7 @@ function drawPlant(){
 
     for(let i=0;i<h;i+=5){
         let sway = Math.sin(i*0.05 + Date.now()*0.003)*10;
-        if(cyclone) sway *= 5;
+        if(cyclone) sway *= 4;
         ctx.lineTo(x+sway, y-i);
     }
     ctx.stroke();
@@ -224,11 +228,11 @@ function drawPlant(){
         ctx.fill();
     }
 
-    // glow
+    // glow reaction
     if(reaction>0){
         ctx.fillStyle="rgba(0,255,0,0.2)";
         ctx.beginPath();
-        ctx.arc(x,y-h,40,0,Math.PI*2);
+        ctx.arc(x,y-h,45,0,Math.PI*2);
         ctx.fill();
         reaction--;
     }
@@ -236,12 +240,23 @@ function drawPlant(){
     if(data.growth >= 1) drawFruits(x,y-h);
 }
 
+// ===== SHIELD BAR =====
+function drawShield(){
+    if(!cyclone) return;
+
+    ctx.fillStyle = "#333";
+    ctx.fillRect(20, 20, 200, 12);
+
+    ctx.fillStyle = "cyan";
+    ctx.fillRect(20, 20, shieldPower * 2, 12);
+}
+
 // ===== FRUITS =====
 let secretFruit = Math.floor(Math.random()*5);
-let fruits=[];
+let fruits = [];
 
 function drawFruits(x,y){
-    fruits=[];
+    fruits = [];
 
     for(let i=0;i<5;i++){
         let fx = x + Math.cos(i*1.2)*60;
@@ -256,16 +271,17 @@ function drawFruits(x,y){
     }
 }
 
+// click detection
 canvas.addEventListener("click", e=>{
     if(data.growth < 1) return;
 
     fruits.forEach(f=>{
-        let dx=e.clientX-f.x;
-        let dy=e.clientY-f.y;
+        let dx = e.clientX - f.x;
+        let dy = e.clientY - f.y;
 
-        if(Math.sqrt(dx*dx+dy*dy)<15){
-            if(f.i===secretFruit){
-                window.location.href="secret.html";
+        if(Math.sqrt(dx*dx+dy*dy) < 15){
+            if(f.i === secretFruit){
+                window.location.href = "secret.html";
             } else {
                 alert("Nothing here...");
             }
@@ -281,6 +297,7 @@ function loop(){
     drawPlant();
     drawRain();
     updateCyclone();
+    drawShield();
 
     document.getElementById("points").innerText = data.points;
 
@@ -289,5 +306,6 @@ function loop(){
 
 loop();
 </script>
+
 </body>
 </html>
