@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Plant Survival - Hardcore</title>
+<title>Plant Survival Final</title>
 
 <style>
 body {
@@ -50,7 +50,6 @@ canvas { display: block; }
     text-align: center;
     line-height: 80px;
 }
-
 .active { background: cyan !important; }
 
 #points {
@@ -101,7 +100,7 @@ bucket.addEventListener("dragend", e=>{
     let plantX = canvas.width/2;
 
     if(Math.abs(e.clientX-plantX)<120 && isFull){
-        data.growth += 0.0008;
+        data.growth += 0.001;
         data.points += 1;
 
         if(data.growth > 1) data.growth = 1;
@@ -113,73 +112,87 @@ bucket.addEventListener("dragend", e=>{
     }
 });
 
-// ===== SHIELD SYSTEM =====
+// ===== SHIELD =====
 let shieldBtn = document.getElementById("shieldBtn");
 let holding = false;
 
-let shieldDelay = 15; // delay before active
-let shieldTimer = 0;
+shieldBtn.addEventListener("mousedown", ()=> {
+    holding = true;
+    shieldBtn.classList.add("active");
+});
 
-let shieldEnergy = 100;
+shieldBtn.addEventListener("mouseup", ()=> {
+    holding = false;
+    shieldBtn.classList.remove("active");
+});
 
-shieldBtn.addEventListener("mousedown", ()=> holding = true);
-shieldBtn.addEventListener("mouseup", ()=> holding = false);
-shieldBtn.addEventListener("touchstart", ()=> holding = true);
-shieldBtn.addEventListener("touchend", ()=> holding = false);
+shieldBtn.addEventListener("touchstart", ()=> {
+    holding = true;
+    shieldBtn.classList.add("active");
+});
 
-// ===== CYCLONE =====
+shieldBtn.addEventListener("touchend", ()=> {
+    holding = false;
+    shieldBtn.classList.remove("active");
+});
+
+// ===== RAIN SYSTEM =====
+let raining = false;
+let rainDrops = [];
+
+setInterval(()=>{
+    raining = Math.random() < 0.5; // more frequent
+}, 5000);
+
+function drawRain(){
+    if(raining){
+        rainDrops.push({
+            x: Math.random()*canvas.width,
+            y: 0,
+            speed: 6 + Math.random()*4
+        });
+    }
+
+    rainDrops.forEach((r,i)=>{
+        ctx.fillStyle = "cyan";
+        ctx.fillRect(r.x, r.y, 2, 12);
+        r.y += r.speed;
+
+        if(r.y > canvas.height-100){
+            data.growth += 0.0005;
+            if(data.growth > 1) data.growth = 1;
+            rainDrops.splice(i,1);
+        }
+    });
+}
+
+// ===== CYCLONE (INSTANT DEATH SYSTEM) =====
 let cyclone = false;
 let cycloneTimer = 0;
 
-function triggerCyclone(){
-    cyclone = true;
-    cycloneTimer = 0;
-}
-
-// RANDOM SUDDEN ATTACK
+// sudden cyclone trigger
 setInterval(()=>{
     if(Math.random() < 0.25){
-        triggerCyclone();
+        cyclone = true;
+        cycloneTimer = 0;
+
+        // CHECK instantly
+        if(!holding){
+            // 💀 instant destruction
+            data.growth = 0;
+            data.points = 0;
+            alert("🌪️ You were not ready.");
+        }
     }
 }, 6000);
 
-// ===== UPDATE =====
-function updateShield(){
-
-    if(holding){
-        shieldTimer++;
-        shieldEnergy -= 1.2;
-    } else {
-        shieldTimer = 0;
-        shieldEnergy += 0.6;
-    }
-
-    if(shieldEnergy > 100) shieldEnergy = 100;
-    if(shieldEnergy < 0) shieldEnergy = 0;
-
-    // active only if held long enough
-    return holding && shieldTimer > shieldDelay && shieldEnergy > 10;
-}
-
+// cyclone effect duration
 function updateCyclone(){
-
     if(!cyclone) return;
 
     cycloneTimer++;
 
-    let activeShield = updateShield();
-
-    if(!activeShield){
-        // INSTANT STRONG DAMAGE
-        data.growth -= 0.04;
-    } else {
-        // still small damage
-        data.growth -= 0.002;
-    }
-
-    if(data.growth < 0) data.growth = 0;
-
-    if(cycloneTimer > 120){
+    if(cycloneTimer > 80){
         cyclone = false;
     }
 }
@@ -213,6 +226,7 @@ function loop(){
     ctx.fillRect(0,0,canvas.width,canvas.height);
 
     drawPlant();
+    drawRain();
     updateCyclone();
 
     document.getElementById("points").innerText = data.points;
@@ -222,6 +236,5 @@ function loop(){
 
 loop();
 </script>
-
 </body>
 </html>
