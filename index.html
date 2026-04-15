@@ -94,6 +94,7 @@ let bucket = document.getElementById("bucket");
 let isFull = false;
 
 document.getElementById("well").onclick = ()=>{
+    if(gameWon) return;
     isFull = true;
     bucket.classList.add("full");
 };
@@ -128,14 +129,23 @@ shieldBtn.onmouseup = ()=>{ holding=false; shieldBtn.classList.remove("active");
 shieldBtn.ontouchstart = ()=>{ holding=true; shieldBtn.classList.add("active"); }
 shieldBtn.ontouchend = ()=>{ holding=false; shieldBtn.classList.remove("active"); }
 
-// ===== RAIN =====
+// ===== RAIN (SHORT BURSTS) =====
 let raining = false;
 let rainDrops = [];
 
+function startRainBurst(){
+    if(gameWon) return;
+    raining = true;
+
+    setTimeout(()=>{ raining = false; }, 1500);
+}
+
 setInterval(()=>{
     if(gameWon) return;
-    raining = Math.random() < 0.5;
-}, 5000);
+    if(Math.random() < 0.5){
+        startRainBurst();
+    }
+}, 4000);
 
 function drawRain(){
     if(gameWon) return;
@@ -148,8 +158,10 @@ function drawRain(){
         });
     }
 
-    rainDrops.forEach((r,i)=>{
-        ctx.fillStyle = "cyan";
+    for(let i=rainDrops.length-1;i>=0;i--){
+        let r = rainDrops[i];
+
+        ctx.fillStyle="cyan";
         ctx.fillRect(r.x, r.y, 2, 12);
         r.y += r.speed;
 
@@ -158,7 +170,7 @@ function drawRain(){
             if(data.growth > 1) data.growth = 1;
             rainDrops.splice(i,1);
         }
-    });
+    }
 }
 
 // ===== CYCLONE =====
@@ -176,6 +188,7 @@ setInterval(()=>{
             data.growth = 0;
             data.points = 0;
             alert("🌪️ Not ready.");
+            save();
         }
     }
 }, 6000);
@@ -193,9 +206,10 @@ function updateCyclone(){
 
 // ===== PLANT =====
 let reaction = 0;
+let fruits = [];
+let secretFruit = Math.floor(Math.random()*5);
 
 function drawPlant(){
-
     let x = canvas.width/2;
     let y = canvas.height-80;
     let h = data.growth * 420;
@@ -213,7 +227,7 @@ function drawPlant(){
     }
     ctx.stroke();
 
-    // LEAVES
+    // leaves
     for(let i=60;i<h;i+=70){
         ctx.fillStyle="green";
         ctx.beginPath();
@@ -221,7 +235,7 @@ function drawPlant(){
         ctx.fill();
     }
 
-    // GLOW
+    // glow
     if(reaction>0){
         ctx.fillStyle="rgba(0,255,0,0.2)";
         ctx.beginPath();
@@ -230,23 +244,20 @@ function drawPlant(){
         reaction--;
     }
 
-    // WIN CONDITION
+    // WIN
     if(data.growth >= 1){
         gameWon = true;
         drawFruits(x,y-h);
 
-        ctx.fillStyle = "white";
-        ctx.font = "20px Arial";
-        ctx.fillText("Choose a fruit", canvas.width/2 - 80, 50);
+        ctx.fillStyle="white";
+        ctx.font="20px Arial";
+        ctx.fillText("Need 50 points to unlock", canvas.width/2 - 120, 50);
     }
 }
 
 // ===== FRUITS =====
-let secretFruit = Math.floor(Math.random()*5);
-let fruits=[];
-
 function drawFruits(x,y){
-    fruits=[];
+    fruits = [];
 
     for(let i=0;i<5;i++){
         let fx = x + Math.cos(i*1.2)*60;
@@ -261,27 +272,31 @@ function drawFruits(x,y){
     }
 }
 
-// CLICK FRUIT
+// CLICK HANDLER (SAFE)
 canvas.addEventListener("click", e=>{
     if(!gameWon) return;
 
-    fruits.forEach(f=>{
-        let dx=e.clientX-f.x;
-        let dy=e.clientY-f.y;
+    for(let f of fruits){
+        let dx = e.clientX - f.x;
+        let dy = e.clientY - f.y;
 
-        if(Math.sqrt(dx*dx+dy*dy)<15){
-            if(f.i===secretFruit){
-                window.location.href="secret.html";
+        if(Math.sqrt(dx*dx+dy*dy) < 15){
+
+            if(f.i === secretFruit){
+                if(data.points >= 50){
+                    window.location.href="secret.html";
+                } else {
+                    alert("❌ Not enough points to unlock reward. You lose.");
+                }
             } else {
                 alert("Nothing here...");
             }
         }
-    });
+    }
 });
 
 // ===== LOOP =====
 function loop(){
-
     ctx.fillStyle="rgba(0,0,0,0.3)";
     ctx.fillRect(0,0,canvas.width,canvas.height);
 
