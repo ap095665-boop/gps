@@ -10,12 +10,12 @@ body {
     margin: 0;
     background: #000;
     overflow: hidden;
-    font-family: Arial;
-    color: white;
+    user-select: none;
 }
 
 canvas { display: block; }
 
+/* WELL */
 #well {
     position: fixed;
     left: 20px;
@@ -28,6 +28,7 @@ canvas { display: block; }
     line-height: 70px;
 }
 
+/* BUCKET */
 #bucket {
     position: fixed;
     left: 20px;
@@ -39,6 +40,7 @@ canvas { display: block; }
 }
 .full { background: cyan !important; }
 
+/* SHIELD BUTTON (NO TEXT) */
 #shieldBtn {
     position: fixed;
     right: 20px;
@@ -47,16 +49,16 @@ canvas { display: block; }
     height: 80px;
     background: #333;
     border-radius: 50%;
-    text-align: center;
-    line-height: 80px;
 }
 .active { background: cyan !important; }
 
+/* POINTS */
 #points {
     position: fixed;
     top: 20px;
     right: 20px;
     font-size: 36px;
+    color: white;
 }
 </style>
 </head>
@@ -66,7 +68,7 @@ canvas { display: block; }
 
 <div id="well">💧</div>
 <div id="bucket"></div>
-<div id="shieldBtn">HOLD</div>
+<div id="shieldBtn"></div>
 <div id="points">0</div>
 
 <script>
@@ -105,6 +107,7 @@ bucket.addEventListener("dragend", e=>{
 
         if(data.growth > 1) data.growth = 1;
 
+        reaction = 20;
         save();
 
         isFull = false;
@@ -116,32 +119,18 @@ bucket.addEventListener("dragend", e=>{
 let shieldBtn = document.getElementById("shieldBtn");
 let holding = false;
 
-shieldBtn.addEventListener("mousedown", ()=> {
-    holding = true;
-    shieldBtn.classList.add("active");
-});
+shieldBtn.onmousedown = ()=>{ holding=true; shieldBtn.classList.add("active"); }
+shieldBtn.onmouseup = ()=>{ holding=false; shieldBtn.classList.remove("active"); }
 
-shieldBtn.addEventListener("mouseup", ()=> {
-    holding = false;
-    shieldBtn.classList.remove("active");
-});
+shieldBtn.ontouchstart = ()=>{ holding=true; shieldBtn.classList.add("active"); }
+shieldBtn.ontouchend = ()=>{ holding=false; shieldBtn.classList.remove("active"); }
 
-shieldBtn.addEventListener("touchstart", ()=> {
-    holding = true;
-    shieldBtn.classList.add("active");
-});
-
-shieldBtn.addEventListener("touchend", ()=> {
-    holding = false;
-    shieldBtn.classList.remove("active");
-});
-
-// ===== RAIN SYSTEM =====
+// ===== RAIN =====
 let raining = false;
 let rainDrops = [];
 
 setInterval(()=>{
-    raining = Math.random() < 0.5; // more frequent
+    raining = Math.random() < 0.5;
 }, 5000);
 
 function drawRain(){
@@ -166,27 +155,24 @@ function drawRain(){
     });
 }
 
-// ===== CYCLONE (INSTANT DEATH SYSTEM) =====
+// ===== CYCLONE =====
 let cyclone = false;
 let cycloneTimer = 0;
 
-// sudden cyclone trigger
 setInterval(()=>{
     if(Math.random() < 0.25){
         cyclone = true;
         cycloneTimer = 0;
 
-        // CHECK instantly
+        // instant check
         if(!holding){
-            // 💀 instant destruction
             data.growth = 0;
             data.points = 0;
-            alert("🌪️ You were not ready.");
+            alert("🌪️ Not ready.");
         }
     }
 }, 6000);
 
-// cyclone effect duration
 function updateCyclone(){
     if(!cyclone) return;
 
@@ -197,12 +183,13 @@ function updateCyclone(){
     }
 }
 
-// ===== DRAW =====
+// ===== PLANT =====
+let reaction = 0;
+
 function drawPlant(){
 
     let x = canvas.width/2;
     let y = canvas.height-80;
-
     let h = data.growth * 420;
 
     ctx.strokeStyle = cyclone ? "red" : "lime";
@@ -217,7 +204,66 @@ function drawPlant(){
         ctx.lineTo(x+sway, y-i);
     }
     ctx.stroke();
+
+    // LEAVES
+    for(let i=60;i<h;i+=70){
+        ctx.fillStyle="green";
+        ctx.beginPath();
+        ctx.ellipse(x+20,y-i,10,5,0,0,Math.PI*2);
+        ctx.fill();
+    }
+
+    // GLOW
+    if(reaction>0){
+        ctx.fillStyle="rgba(0,255,0,0.2)";
+        ctx.beginPath();
+        ctx.arc(x,y-h,40,0,Math.PI*2);
+        ctx.fill();
+        reaction--;
+    }
+
+    if(data.growth >= 1){
+        drawFruits(x,y-h);
+    }
 }
+
+// ===== FRUITS =====
+let secretFruit = Math.floor(Math.random()*5);
+let fruits=[];
+
+function drawFruits(x,y){
+    fruits=[];
+
+    for(let i=0;i<5;i++){
+        let fx = x + Math.cos(i*1.2)*60;
+        let fy = y - Math.sin(i*1.2)*40;
+
+        fruits.push({x:fx,y:fy,i});
+
+        ctx.fillStyle="red";
+        ctx.beginPath();
+        ctx.arc(fx,fy,12,0,Math.PI*2);
+        ctx.fill();
+    }
+}
+
+// CLICK FRUIT
+canvas.addEventListener("click", e=>{
+    if(data.growth < 1) return;
+
+    fruits.forEach(f=>{
+        let dx=e.clientX-f.x;
+        let dy=e.clientY-f.y;
+
+        if(Math.sqrt(dx*dx+dy*dy)<15){
+            if(f.i===secretFruit){
+                window.location.href="secret.html";
+            } else {
+                alert("Nothing here...");
+            }
+        }
+    });
+});
 
 // ===== LOOP =====
 function loop(){
