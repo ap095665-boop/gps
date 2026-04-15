@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Survival Plant</title>
+<title>Plant Survival</title>
 
 <style>
 body {
     margin: 0;
-    background: radial-gradient(circle, #0a0a0a, #000);
+    background: #000;
     overflow: hidden;
     font-family: Arial;
     color: white;
@@ -16,7 +16,6 @@ body {
 
 canvas { display: block; }
 
-/* WELL */
 #well {
     position: fixed;
     left: 20px;
@@ -27,10 +26,8 @@ canvas { display: block; }
     border-radius: 50%;
     text-align: center;
     line-height: 70px;
-    font-size: 22px;
 }
 
-/* BUCKET */
 #bucket {
     position: fixed;
     left: 20px;
@@ -39,39 +36,34 @@ canvas { display: block; }
     height: 55px;
     background: #444;
     border-radius: 10px;
-    cursor: grab;
 }
 .full { background: cyan !important; }
 
-/* POINTS */
 #points {
     position: fixed;
     top: 20px;
     right: 20px;
-    font-size: 40px;
-    font-weight: bold;
+    font-size: 36px;
 }
 
-/* ALERT */
 #alert {
     position: fixed;
-    top: 50%;
+    top: 40%;
     width: 100%;
     text-align: center;
-    font-size: 28px;
-    color: red;
+    font-size: 26px;
     display: none;
+    color: red;
 }
 </style>
 </head>
 <body>
 
 <canvas id="canvas"></canvas>
-
 <div id="well">💧</div>
 <div id="bucket"></div>
 <div id="points">0</div>
-<div id="alert">🌪️ TAP FAST TO PROTECT!</div>
+<div id="alert">🌪️ TAP FAST!</div>
 
 <script>
 const canvas = document.getElementById("canvas");
@@ -104,8 +96,10 @@ bucket.addEventListener("dragend", e=>{
     let plantX = canvas.width/2;
 
     if(Math.abs(e.clientX-plantX)<120 && isFull){
-        data.growth += 0.002;
+        data.growth += 0.001; // slower growth
         data.points += 1;
+
+        if(data.growth > 1) data.growth = 1;
 
         reaction = 20;
 
@@ -119,72 +113,9 @@ bucket.addEventListener("dragend", e=>{
 // ===== RAIN =====
 let raining = false;
 setInterval(()=>{
-    raining = Math.random()<0.4;
-}, 6000);
+    raining = Math.random()<0.3;
+}, 7000);
 
-// ===== CYCLONE =====
-let cyclone = false;
-let tapPower = 0;
-
-setInterval(()=>{
-    if(Math.random()<0.25){
-        cyclone = true;
-        tapPower = 0;
-        document.getElementById("alert").style.display = "block";
-    }
-}, 10000);
-
-// TAP DEFENSE
-canvas.addEventListener("click", ()=>{
-    if(cyclone){
-        tapPower += 1;
-    }
-});
-
-// ===== DRAW =====
-let reaction = 0;
-
-function drawPlant(){
-    let x = canvas.width/2;
-    let y = canvas.height-80;
-
-    let h = data.growth * 500;
-
-    ctx.strokeStyle = cyclone ? "red" : "lime";
-    ctx.lineWidth = 4;
-
-    ctx.beginPath();
-    ctx.moveTo(x,y);
-
-    for(let i=0;i<h;i+=5){
-        let sway = Math.sin(i*0.05 + Date.now()*0.005)*10;
-        if(cyclone) sway *= 5;
-        ctx.lineTo(x+sway, y-i);
-    }
-    ctx.stroke();
-
-    // LEAVES
-    for(let i=60;i<h;i+=70){
-        ctx.fillStyle="green";
-        ctx.beginPath();
-        ctx.ellipse(x+20,y-i,10,5,0,0,Math.PI*2);
-        ctx.fill();
-    }
-
-    // REACTION
-    if(reaction>0){
-        ctx.fillStyle="rgba(0,255,0,0.2)";
-        ctx.beginPath();
-        ctx.arc(x,y-h,50,0,Math.PI*2);
-        ctx.fill();
-        reaction--;
-    }
-
-    // FRUITS
-    if(data.growth>=1) drawFruits(x,y-h);
-}
-
-// ===== RAIN DRAW =====
 let rainDrops=[];
 
 function drawRain(){
@@ -192,7 +123,7 @@ function drawRain(){
         rainDrops.push({
             x: Math.random()*canvas.width,
             y:0,
-            speed:5+Math.random()*5
+            speed:5+Math.random()*4
         });
     }
 
@@ -202,68 +133,153 @@ function drawRain(){
         r.y+=r.speed;
 
         if(r.y>canvas.height-100){
-            data.growth+=0.0005;
+            data.growth += 0.0003;
+            if(data.growth > 1) data.growth = 1;
             rainDrops.splice(i,1);
         }
     });
 }
 
-// ===== CYCLONE LOGIC =====
-function handleCyclone(){
+// ===== CYCLONE =====
+let cyclone = false;
+let tapCount = 0;
+let cycloneTime = 0;
+
+setInterval(()=>{
+    if(!cyclone && Math.random()<0.15){
+        cyclone = true;
+        tapCount = 0;
+        cycloneTime = 0;
+        document.getElementById("alert").style.display="block";
+    }
+}, 12000);
+
+// TAP TRACK
+canvas.addEventListener("click", ()=>{
+    if(cyclone){
+        tapCount++;
+    }
+});
+
+// ===== HANDLE CYCLONE =====
+function updateCyclone(){
     if(!cyclone) return;
 
-    if(tapPower>30){
-        cyclone=false;
+    cycloneTime++;
+
+    // success condition
+    if(tapCount > 40){
+        cyclone = false;
         document.getElementById("alert").style.display="none";
-    } else {
-        // DAMAGE
-        data.growth -= 0.002;
-        if(data.growth <= 0){
-            alert("Plant destroyed 💀 Restarting...");
-            data.growth = 0;
-            data.points = 0;
-        }
+        return;
     }
+
+    // damage slowly
+    if(cycloneTime % 10 === 0){
+        data.growth -= 0.01;
+        if(data.growth < 0) data.growth = 0;
+    }
+
+    // timeout fail
+    if(cycloneTime > 200){
+        cyclone = false;
+        document.getElementById("alert").style.display="none";
+    }
+}
+
+// ===== DRAW PLANT =====
+let reaction = 0;
+
+function drawPlant(){
+    let x = canvas.width/2;
+    let y = canvas.height-80;
+
+    let h = data.growth * 400;
+
+    ctx.strokeStyle = cyclone ? "red" : "lime";
+    ctx.lineWidth = 4;
+
+    ctx.beginPath();
+    ctx.moveTo(x,y);
+
+    for(let i=0;i<h;i+=5){
+        let sway = Math.sin(i*0.05 + Date.now()*0.002)*10;
+        if(cyclone) sway *= 3;
+        ctx.lineTo(x+sway, y-i);
+    }
+    ctx.stroke();
+
+    // leaves
+    for(let i=60;i<h;i+=70){
+        ctx.fillStyle="green";
+        ctx.beginPath();
+        ctx.ellipse(x+20,y-i,10,5,0,0,Math.PI*2);
+        ctx.fill();
+    }
+
+    // glow
+    if(reaction>0){
+        ctx.fillStyle="rgba(0,255,0,0.2)";
+        ctx.beginPath();
+        ctx.arc(x,y-h,40,0,Math.PI*2);
+        ctx.fill();
+        reaction--;
+    }
+
+    // fruits only when fully grown
+    if(data.growth >= 1) drawFruits(x,y-h);
 }
 
 // ===== FRUITS =====
 let secretFruit = Math.floor(Math.random()*5);
+let fruitPositions = [];
 
 function drawFruits(x,y){
+
+    fruitPositions = [];
+
     for(let i=0;i<5;i++){
-        let fx = x + Math.cos(i*1.2)*70;
+        let fx = x + Math.cos(i*1.2)*60;
         let fy = y - Math.sin(i*1.2)*40;
+
+        fruitPositions.push({x:fx,y:fy,i});
 
         ctx.fillStyle="red";
         ctx.beginPath();
         ctx.arc(fx,fy,12,0,Math.PI*2);
         ctx.fill();
-
-        canvas.onclick = e=>{
-            let dx=e.clientX-fx;
-            let dy=e.clientY-fy;
-
-            if(Math.sqrt(dx*dx+dy*dy)<15){
-                if(i===secretFruit){
-                    window.location.href="secret.html";
-                } else {
-                    alert("Nothing here...");
-                }
-            }
-        };
     }
 }
 
+// CLICK CHECK (FIXED)
+canvas.addEventListener("click", e=>{
+    if(data.growth < 1) return;
+
+    fruitPositions.forEach(f=>{
+        let dx=e.clientX-f.x;
+        let dy=e.clientY-f.y;
+
+        if(Math.sqrt(dx*dx+dy*dy)<15){
+            if(f.i===secretFruit){
+                window.location.href="secret.html";
+            } else {
+                alert("Nothing here...");
+            }
+        }
+    });
+});
+
 // ===== LOOP =====
 function loop(){
+
     ctx.fillStyle="rgba(0,0,0,0.2)";
     ctx.fillRect(0,0,canvas.width,canvas.height);
 
     drawPlant();
     drawRain();
-    handleCyclone();
+    updateCyclone();
 
-    document.getElementById("points").innerText = Math.floor(data.points);
+    document.getElementById("points").innerText = data.points;
 
     requestAnimationFrame(loop);
 }
