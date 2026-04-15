@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Plant Survival - Shield Mode</title>
+<title>Plant Survival - Hardcore</title>
 
 <style>
 body {
@@ -16,7 +16,6 @@ body {
 
 canvas { display: block; }
 
-/* WELL */
 #well {
     position: fixed;
     left: 20px;
@@ -29,7 +28,6 @@ canvas { display: block; }
     line-height: 70px;
 }
 
-/* BUCKET */
 #bucket {
     position: fixed;
     left: 20px;
@@ -41,7 +39,6 @@ canvas { display: block; }
 }
 .full { background: cyan !important; }
 
-/* SHIELD BUTTON */
 #shieldBtn {
     position: fixed;
     right: 20px;
@@ -52,31 +49,15 @@ canvas { display: block; }
     border-radius: 50%;
     text-align: center;
     line-height: 80px;
-    font-size: 14px;
-    user-select: none;
 }
 
-#shieldBtn.active {
-    background: cyan;
-}
+.active { background: cyan !important; }
 
-/* POINTS */
 #points {
     position: fixed;
     top: 20px;
     right: 20px;
     font-size: 36px;
-}
-
-/* ALERT */
-#alert {
-    position: fixed;
-    top: 35%;
-    width: 100%;
-    text-align: center;
-    font-size: 28px;
-    display: none;
-    color: orange;
 }
 </style>
 </head>
@@ -88,7 +69,6 @@ canvas { display: block; }
 <div id="bucket"></div>
 <div id="shieldBtn">HOLD</div>
 <div id="points">0</div>
-<div id="alert">⚠️ CYCLONE INCOMING</div>
 
 <script>
 const canvas = document.getElementById("canvas");
@@ -121,12 +101,11 @@ bucket.addEventListener("dragend", e=>{
     let plantX = canvas.width/2;
 
     if(Math.abs(e.clientX-plantX)<120 && isFull){
-        data.growth += 0.001;
+        data.growth += 0.0008;
         data.points += 1;
 
         if(data.growth > 1) data.growth = 1;
 
-        reaction = 20;
         save();
 
         isFull = false;
@@ -134,101 +113,80 @@ bucket.addEventListener("dragend", e=>{
     }
 });
 
-// ===== SHIELD HOLD =====
-let shieldActive = false;
+// ===== SHIELD SYSTEM =====
 let shieldBtn = document.getElementById("shieldBtn");
+let holding = false;
 
-shieldBtn.addEventListener("mousedown", ()=> activateShield());
-shieldBtn.addEventListener("touchstart", ()=> activateShield());
+let shieldDelay = 15; // delay before active
+let shieldTimer = 0;
 
-shieldBtn.addEventListener("mouseup", ()=> deactivateShield());
-shieldBtn.addEventListener("touchend", ()=> deactivateShield());
+let shieldEnergy = 100;
 
-function activateShield(){
-    shieldActive = true;
-    shieldBtn.classList.add("active");
-}
+shieldBtn.addEventListener("mousedown", ()=> holding = true);
+shieldBtn.addEventListener("mouseup", ()=> holding = false);
+shieldBtn.addEventListener("touchstart", ()=> holding = true);
+shieldBtn.addEventListener("touchend", ()=> holding = false);
 
-function deactivateShield(){
-    shieldActive = false;
-    shieldBtn.classList.remove("active");
-}
-
-// ===== RAIN =====
-let raining = false;
-let rainDrops = [];
-
-setInterval(()=>{
-    raining = Math.random() < 0.3;
-}, 7000);
-
-function drawRain(){
-    if(raining){
-        rainDrops.push({
-            x: Math.random()*canvas.width,
-            y: 0,
-            speed: 5 + Math.random()*5
-        });
-    }
-
-    rainDrops.forEach((r,i)=>{
-        ctx.fillStyle = "cyan";
-        ctx.fillRect(r.x, r.y, 2, 12);
-        r.y += r.speed;
-
-        if(r.y > canvas.height-100){
-            data.growth += 0.0003;
-            if(data.growth > 1) data.growth = 1;
-            rainDrops.splice(i,1);
-        }
-    });
-}
-
-// ===== CYCLONE SYSTEM =====
+// ===== CYCLONE =====
 let cyclone = false;
-let warning = false;
 let cycloneTimer = 0;
 
-// WARNING PHASE
+function triggerCyclone(){
+    cyclone = true;
+    cycloneTimer = 0;
+}
+
+// RANDOM SUDDEN ATTACK
 setInterval(()=>{
-    if(!cyclone && Math.random()<0.2){
-        warning = true;
-        document.getElementById("alert").style.display="block";
-
-        setTimeout(()=>{
-            warning = false;
-            cyclone = true;
-            cycloneTimer = 0;
-            document.getElementById("alert").innerText="🌪️ CYCLONE!";
-        }, 2000);
+    if(Math.random() < 0.25){
+        triggerCyclone();
     }
-}, 10000);
+}, 6000);
 
-// CYCLONE LOGIC
+// ===== UPDATE =====
+function updateShield(){
+
+    if(holding){
+        shieldTimer++;
+        shieldEnergy -= 1.2;
+    } else {
+        shieldTimer = 0;
+        shieldEnergy += 0.6;
+    }
+
+    if(shieldEnergy > 100) shieldEnergy = 100;
+    if(shieldEnergy < 0) shieldEnergy = 0;
+
+    // active only if held long enough
+    return holding && shieldTimer > shieldDelay && shieldEnergy > 10;
+}
+
 function updateCyclone(){
+
     if(!cyclone) return;
 
     cycloneTimer++;
 
-    // If shield NOT active → heavy damage
-    if(!shieldActive){
-        data.growth -= 0.02;
+    let activeShield = updateShield();
+
+    if(!activeShield){
+        // INSTANT STRONG DAMAGE
+        data.growth -= 0.04;
+    } else {
+        // still small damage
+        data.growth -= 0.002;
     }
 
     if(data.growth < 0) data.growth = 0;
 
-    // end cyclone
-    if(cycloneTimer > 180){
+    if(cycloneTimer > 120){
         cyclone = false;
-        document.getElementById("alert").style.display="none";
-        document.getElementById("alert").innerText="⚠️ CYCLONE INCOMING";
     }
 }
 
-// ===== DRAW PLANT =====
-let reaction = 0;
-
+// ===== DRAW =====
 function drawPlant(){
+
     let x = canvas.width/2;
     let y = canvas.height-80;
 
@@ -241,76 +199,20 @@ function drawPlant(){
     ctx.moveTo(x,y);
 
     for(let i=0;i<h;i+=5){
-        let sway = Math.sin(i*0.05 + Date.now()*0.003)*10;
-        if(cyclone) sway *= 5;
+        let sway = Math.sin(i*0.05 + Date.now()*0.004)*10;
+        if(cyclone) sway *= 6;
         ctx.lineTo(x+sway, y-i);
     }
     ctx.stroke();
-
-    // leaves
-    for(let i=60;i<h;i+=70){
-        ctx.fillStyle="green";
-        ctx.beginPath();
-        ctx.ellipse(x+20,y-i,10,5,0,0,Math.PI*2);
-        ctx.fill();
-    }
-
-    // glow
-    if(reaction>0){
-        ctx.fillStyle="rgba(0,255,0,0.2)";
-        ctx.beginPath();
-        ctx.arc(x,y-h,40,0,Math.PI*2);
-        ctx.fill();
-        reaction--;
-    }
-
-    if(data.growth>=1) drawFruits(x,y-h);
 }
-
-// ===== FRUITS =====
-let secretFruit = Math.floor(Math.random()*5);
-let fruits=[];
-
-function drawFruits(x,y){
-    fruits=[];
-
-    for(let i=0;i<5;i++){
-        let fx = x + Math.cos(i*1.2)*60;
-        let fy = y - Math.sin(i*1.2)*40;
-
-        fruits.push({x:fx,y:fy,i});
-
-        ctx.fillStyle="red";
-        ctx.beginPath();
-        ctx.arc(fx,fy,12,0,Math.PI*2);
-        ctx.fill();
-    }
-}
-
-canvas.addEventListener("click", e=>{
-    if(data.growth < 1) return;
-
-    fruits.forEach(f=>{
-        let dx=e.clientX-f.x;
-        let dy=e.clientY-f.y;
-
-        if(Math.sqrt(dx*dx+dy*dy)<15){
-            if(f.i===secretFruit){
-                window.location.href="secret.html";
-            } else {
-                alert("Nothing here...");
-            }
-        }
-    });
-});
 
 // ===== LOOP =====
 function loop(){
-    ctx.fillStyle="rgba(0,0,0,0.25)";
+
+    ctx.fillStyle="rgba(0,0,0,0.3)";
     ctx.fillRect(0,0,canvas.width,canvas.height);
 
     drawPlant();
-    drawRain();
     updateCyclone();
 
     document.getElementById("points").innerText = data.points;
@@ -320,5 +222,6 @@ function loop(){
 
 loop();
 </script>
+
 </body>
 </html>
