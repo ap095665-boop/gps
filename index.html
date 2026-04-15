@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Plant Survival Final</title>
+<title>Plant Survival Ultimate</title>
 
 <style>
 body {
@@ -40,7 +40,7 @@ canvas { display: block; }
 }
 .full { background: cyan !important; }
 
-/* SHIELD BUTTON (NO TEXT) */
+/* SHIELD */
 #shieldBtn {
     position: fixed;
     right: 20px;
@@ -83,6 +83,8 @@ let data = JSON.parse(localStorage.getItem("plantGame")) || {
     points: 0
 };
 
+let gameWon = false;
+
 function save(){
     localStorage.setItem("plantGame", JSON.stringify(data));
 }
@@ -99,6 +101,8 @@ document.getElementById("well").onclick = ()=>{
 bucket.draggable = true;
 
 bucket.addEventListener("dragend", e=>{
+    if(gameWon) return;
+
     let plantX = canvas.width/2;
 
     if(Math.abs(e.clientX-plantX)<120 && isFull){
@@ -121,7 +125,6 @@ let holding = false;
 
 shieldBtn.onmousedown = ()=>{ holding=true; shieldBtn.classList.add("active"); }
 shieldBtn.onmouseup = ()=>{ holding=false; shieldBtn.classList.remove("active"); }
-
 shieldBtn.ontouchstart = ()=>{ holding=true; shieldBtn.classList.add("active"); }
 shieldBtn.ontouchend = ()=>{ holding=false; shieldBtn.classList.remove("active"); }
 
@@ -130,10 +133,13 @@ let raining = false;
 let rainDrops = [];
 
 setInterval(()=>{
+    if(gameWon) return;
     raining = Math.random() < 0.5;
 }, 5000);
 
 function drawRain(){
+    if(gameWon) return;
+
     if(raining){
         rainDrops.push({
             x: Math.random()*canvas.width,
@@ -160,11 +166,12 @@ let cyclone = false;
 let cycloneTimer = 0;
 
 setInterval(()=>{
+    if(gameWon) return;
+
     if(Math.random() < 0.25){
         cyclone = true;
         cycloneTimer = 0;
 
-        // instant check
         if(!holding){
             data.growth = 0;
             data.points = 0;
@@ -174,6 +181,7 @@ setInterval(()=>{
 }, 6000);
 
 function updateCyclone(){
+    if(gameWon) return;
     if(!cyclone) return;
 
     cycloneTimer++;
@@ -222,8 +230,14 @@ function drawPlant(){
         reaction--;
     }
 
+    // WIN CONDITION
     if(data.growth >= 1){
+        gameWon = true;
         drawFruits(x,y-h);
+
+        ctx.fillStyle = "white";
+        ctx.font = "20px Arial";
+        ctx.fillText("Choose a fruit", canvas.width/2 - 80, 50);
     }
 }
 
@@ -249,7 +263,7 @@ function drawFruits(x,y){
 
 // CLICK FRUIT
 canvas.addEventListener("click", e=>{
-    if(data.growth < 1) return;
+    if(!gameWon) return;
 
     fruits.forEach(f=>{
         let dx=e.clientX-f.x;
