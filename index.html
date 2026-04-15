@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Growing Plant Game</title>
+<title>Plant Growth Game</title>
 
 <style>
 body {
     margin: 0;
-    background: linear-gradient(#0a0a0a, #1c1c1c);
+    background: #0b0b0b;
     overflow: hidden;
-    font-family: sans-serif;
+    font-family: Arial;
     color: white;
 }
 
@@ -18,40 +18,41 @@ canvas {
     display: block;
 }
 
-#ui {
-    position: fixed;
-    bottom: 20px;
-    width: 100%;
-    text-align: center;
-}
-
-button {
-    padding: 10px 20px;
-    border-radius: 20px;
-    border: none;
-    background: rgba(255,255,255,0.1);
-    color: white;
-}
-
-#water {
-    position: fixed;
-    left: 20px;
-    bottom: 100px;
-    width: 50px;
-    height: 50px;
-    background: cyan;
-    border-radius: 10px;
-    cursor: grab;
-}
-
+/* WELL */
 #well {
     position: fixed;
     left: 20px;
     bottom: 20px;
     width: 70px;
     height: 70px;
-    background: #333;
+    background: #222;
     border-radius: 50%;
+    text-align: center;
+    line-height: 70px;
+}
+
+/* BUCKET */
+#bucket {
+    position: fixed;
+    left: 20px;
+    bottom: 110px;
+    width: 50px;
+    height: 50px;
+    background: gray;
+    border-radius: 10px;
+    cursor: grab;
+}
+
+.full {
+    background: cyan !important;
+}
+
+/* UI */
+#info {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    font-size: 14px;
 }
 </style>
 </head>
@@ -59,11 +60,12 @@ button {
 
 <canvas id="canvas"></canvas>
 
-<div id="well"></div>
-<div id="water" draggable="true"></div>
+<div id="well">🕳️</div>
+<div id="bucket"></div>
 
-<div id="ui">
-    <button onclick="saveProgress()">💾 Save</button>
+<div id="info">
+🌱 Points: <span id="points">0</span><br>
+📅 Day: <span id="day"></span>
 </div>
 
 <script>
@@ -73,42 +75,89 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-let plant = {
-    growth: 0,
-    wateredToday: false
+// ===== LOAD / INIT =====
+let data = JSON.parse(localStorage.getItem("plantData")) || {
+    startDate: new Date().toISOString(),
+    lastWaterDate: "",
+    points: 0,
+    bonusGrowth: 0
 };
 
+// ===== DATE =====
 let today = new Date();
-let targetDate = new Date(today.getFullYear(), 11, 25); // Dec 25
+let todayStr = today.toDateString();
 
-// LOAD
-let saved = JSON.parse(localStorage.getItem("plantGame"));
-if (saved) plant = saved;
+let startDate = new Date(data.startDate);
+let targetDate = new Date(today.getFullYear(), 11, 25);
 
-// CALCULATE GROWTH BASED ON DATE
-function calculateGrowth() {
-    let start = new Date(today.getFullYear(), 0, 1);
-    let totalDays = (targetDate - start) / (1000*60*60*24);
-    let currentDays = (today - start) / (1000*60*60*24);
+// ===== DAY COUNT =====
+let days = Math.floor((today - startDate)/(1000*60*60*24));
+document.getElementById("day").innerText = days;
 
-    let baseGrowth = currentDays / totalDays;
-    plant.growth = Math.max(plant.growth, baseGrowth);
+// ===== GROWTH =====
+let totalDays = (targetDate - startDate)/(1000*60*60*24);
+let passedDays = (today - startDate)/(1000*60*60*24);
+
+let growth = Math.min(1, (passedDays / totalDays) + data.bonusGrowth);
+
+// ===== BUCKET STATE =====
+let bucket = document.getElementById("bucket");
+let isFull = false;
+
+// ===== FILL FROM WELL =====
+document.getElementById("well").onclick = () => {
+    isFull = true;
+    bucket.classList.add("full");
+};
+
+// ===== DRAG =====
+bucket.draggable = true;
+
+bucket.addEventListener("dragend", e => {
+    let plantX = canvas.width / 2;
+
+    if (Math.abs(e.clientX - plantX) < 120 && isFull) {
+
+        // ONE WATER PER DAY
+        if (data.lastWaterDate !== todayStr) {
+
+            data.lastWaterDate = todayStr;
+            data.points += 10;
+            data.bonusGrowth += 0.02;
+
+            reactionEffect();
+
+            save();
+
+        } else {
+            alert("Already watered today 💧");
+        }
+
+        // EMPTY BUCKET
+        isFull = false;
+        bucket.classList.remove("full");
+    }
+});
+
+// ===== SAVE =====
+function save() {
+    localStorage.setItem("plantData", JSON.stringify(data));
 }
 
-calculateGrowth();
+// ===== PLANT REACTION =====
+let reaction = 0;
 
-// WIND EFFECT
-let wind = 0;
-setInterval(() => {
-    wind = (Math.random() - 0.5) * 0.5;
-}, 2000);
+function reactionEffect() {
+    reaction = 20;
+}
 
-// DRAW PLANT
+// ===== DRAW =====
 function drawPlant() {
-    let baseX = canvas.width / 2;
-    let baseY = canvas.height - 100;
 
-    let height = plant.growth * 300;
+    let baseX = canvas.width / 2;
+    let baseY = canvas.height - 80;
+
+    let height = growth * 400;
 
     ctx.strokeStyle = "lime";
     ctx.lineWidth = 4;
@@ -116,71 +165,79 @@ function drawPlant() {
     ctx.beginPath();
     ctx.moveTo(baseX, baseY);
 
-    // stem with wind sway
     for (let i = 0; i < height; i += 5) {
-        let sway = Math.sin(i * 0.05 + Date.now() * 0.002) * 10 + wind * 50;
+        let sway = Math.sin(i*0.05 + Date.now()*0.002) * 10;
         ctx.lineTo(baseX + sway, baseY - i);
     }
 
     ctx.stroke();
 
-    // leaves
-    for (let i = 50; i < height; i += 50) {
+    // LEAVES
+    for (let i = 50; i < height; i += 60) {
         ctx.fillStyle = "green";
         ctx.beginPath();
         ctx.ellipse(baseX + 20, baseY - i, 10, 5, 0, 0, Math.PI*2);
         ctx.fill();
     }
 
-    // FULLY GROWN → FRUITS
-    if (plant.growth >= 1) {
-        drawFruits(baseX, baseY - height);
+    // REACTION GLOW
+    if (reaction > 0) {
+        ctx.fillStyle = "rgba(0,255,0,0.2)";
+        ctx.beginPath();
+        ctx.arc(baseX, baseY - height, 40, 0, Math.PI*2);
+        ctx.fill();
+        reaction--;
     }
+
+    // 🎄 DEC 25 → FRUITS
+    if (growth >= 1) drawFruits(baseX, baseY - height);
 }
 
-// FRUITS
+// ===== FRUITS =====
+let secretFruit = 2;
+
 function drawFruits(x, y) {
     for (let i = 0; i < 5; i++) {
-        let fx = x + Math.cos(i) * 50;
-        let fy = y - Math.sin(i) * 30;
+
+        let fx = x + Math.cos(i * 1.2) * 60;
+        let fy = y - Math.sin(i * 1.2) * 40;
 
         ctx.fillStyle = "red";
         ctx.beginPath();
-        ctx.arc(fx, fy, 10, 0, Math.PI*2);
+        ctx.arc(fx, fy, 12, 0, Math.PI*2);
         ctx.fill();
+
+        // CLICK DETECTION
+        canvas.onclick = e => {
+            let dx = e.clientX - fx;
+            let dy = e.clientY - fy;
+
+            if (Math.sqrt(dx*dx + dy*dy) < 15) {
+
+                if (i === secretFruit) {
+
+                    if (data.points >= 200) {
+                        window.location.href = "secret.html";
+                    } else {
+                        alert("Not enough points");
+                    }
+
+                } else {
+                    alert("Nothing here...");
+                }
+            }
+        };
     }
 }
 
-// CLICK FRUIT → SECRET
-canvas.addEventListener("click", e => {
-    if (plant.growth >= 1) {
-        alert("🎁 Secret Unlocked!\n\nYou stayed consistent.\nReward: /secret.html");
-    }
-});
-
-// WATER DRAG
-const water = document.getElementById("water");
-
-water.addEventListener("dragend", e => {
-    let plantAreaX = canvas.width / 2;
-
-    if (Math.abs(e.clientX - plantAreaX) < 100) {
-        if (!plant.wateredToday) {
-            plant.growth += 0.01;
-            plant.wateredToday = true;
-        }
-    }
-});
-
-// SAVE
-function saveProgress() {
-    localStorage.setItem("plantGame", JSON.stringify(plant));
-}
-
-// LOOP
+// ===== LOOP =====
 function loop() {
     ctx.clearRect(0,0,canvas.width,canvas.height);
+
     drawPlant();
+
+    document.getElementById("points").innerText = data.points;
+
     requestAnimationFrame(loop);
 }
 
